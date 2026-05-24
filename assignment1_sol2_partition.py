@@ -1,11 +1,11 @@
 import logging
 
-from join_engine import join_sqlite
+from join_engine import join_hash_partition
 
 
 def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-    join_sqlite(job_id="partitioned")
+    join_hash_partition(job_id="partitioned")
 
 
 if __name__ == "__main__":

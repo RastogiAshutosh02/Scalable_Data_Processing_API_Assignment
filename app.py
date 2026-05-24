@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Data Join API")
 
-# in-memory job store - gets wiped on server restart, but good enough for now
+# in-memory job store
 jobs = {}
 
 _thread_pool = ThreadPoolExecutor(max_workers=4)
@@ -37,16 +37,7 @@ def _run_join_worker(job_id):
 #
 # FastAPI sends the HTTP response first, then runs the background task.
 # The blocking join work is pushed off to a thread so the event loop stays free.
-#
-# Pros:
-#   - no extra infrastructure (no Celery, no Redis, nothing to install)
-#   - simple to implement, tasks start immediately after response
-#   - job status is in shared memory so reads are instant
-#
-# Cons:
-#   - GIL means threads can't truly run in parallel on multiple cores
-#   - a crashing thread affects the whole API server process
-#   - jobs are lost if the server restarts
+
 @app.post("/trigger-join/background-tasks")
 async def trigger_background_tasks(background_tasks: BackgroundTasks):
     job_id = str(uuid.uuid4())[:8]
@@ -71,17 +62,8 @@ async def _run_in_thread(job_id):
 #
 # Spawns a real OS process for each job. asyncio.create_task lets the event loop
 # keep going while we await the process future in the background.
-#
-# Pros:
-#   - true CPU parallelism, completely bypasses the GIL
-#   - process isolation means a crash in the worker won't take down the API
-#   - OS reclaims the subprocess memory when it exits
-#
-# Cons:
-#   - forking a new Python process takes ~100-300ms of startup overhead
-#   - the subprocess can't directly write to the parent's jobs dict,
-#     so we update status from the parent once the future resolves
-#   - each subprocess carries its own Python interpreter (~30-50MB extra)
+
+
 @app.post("/trigger-join/process-pool")
 async def trigger_process_pool():
     job_id = str(uuid.uuid4())[:8]
