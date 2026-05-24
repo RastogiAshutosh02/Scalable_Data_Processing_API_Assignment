@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.pyo
+*.db
+users.csv
+transactions.csv
+result_*.csv
+_temp_*.db
+*.egg-info/
+.DS_Store
