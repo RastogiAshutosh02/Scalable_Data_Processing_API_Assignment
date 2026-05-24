@@ -23,7 +23,6 @@ _thread_pool = ThreadPoolExecutor(max_workers=4)
 _process_pool = ProcessPoolExecutor(max_workers=2)
 
 
-# worker function needs to be at module level so ProcessPoolExecutor can pickle it
 def _run_join_worker(job_id):
     import logging
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -32,11 +31,6 @@ def _run_join_worker(job_id):
     join_sqlite(job_id=job_id)
     log.info("[%s] Worker finished - result_%s.csv written", job_id, job_id)
 
-
-# Approach 1: BackgroundTasks + ThreadPoolExecutor
-#
-# FastAPI sends the HTTP response first, then runs the background task.
-# The blocking join work is pushed off to a thread so the event loop stays free.
 
 @app.post("/trigger-join/background-tasks")
 async def trigger_background_tasks(background_tasks: BackgroundTasks):
@@ -56,12 +50,6 @@ async def _run_in_thread(job_id):
     except Exception as e:
         jobs[job_id].update({"status": "failed", "error": str(e)})
         logger.error("[%s] Thread job failed: %s", job_id, e)
-
-
-# Approach 2: ProcessPoolExecutor
-#
-# Spawns a real OS process for each job. asyncio.create_task lets the event loop
-# keep going while we await the process future in the background.
 
 
 @app.post("/trigger-join/process-pool")

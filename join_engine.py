@@ -7,7 +7,7 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 CHUNK_SIZE = 50_000
-NUM_BUCKETS = 25   # 5M users / 25 = ~200k users per bucket, well under 256MB
+NUM_BUCKETS = 25
 BASE_DIR = Path(__file__).parent
 
 
@@ -37,11 +37,10 @@ def join_sqlite(users_path=None, transactions_path=None, output_path=None, job_i
 
 
 def _setup_db(conn):
-    # cap sqlite's in-memory page cache to ~32MB so we stay within the 256MB limit
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
-    conn.execute("PRAGMA cache_size=-32000")
-    conn.execute("PRAGMA temp_store=FILE")  # spill sort/hash work to disk
+    conn.execute("PRAGMA cache_size=-32000")  # ~32MB page cache
+    conn.execute("PRAGMA temp_store=FILE")
 
     conn.execute("""
         CREATE TABLE users (
@@ -115,18 +114,6 @@ def _run_join(conn, output_path, job_id):
             writer.writerows(rows)
     logger.info("[%s] Join complete, result written to %s", job_id, output_path)
 
-
-# ---------------------------------------------------------------------------
-# Algorithm 2: Hash-Partition Join
-#
-# Two-pass, purely file-based. Pass 1 scans both CSVs once and distributes
-# every row into one of NUM_BUCKETS files keyed by user_id % NUM_BUCKETS.
-# Pass 2 loads each user bucket entirely into a dict (small enough to fit in
-# RAM), then streams the matching transaction bucket and emits joined rows.
-#
-# No external database required. Memory at any moment = one user bucket dict
-# + one transaction row, so peak usage is bounded by bucket size.
-# ---------------------------------------------------------------------------
 
 def join_hash_partition(users_path=None, transactions_path=None, output_path=None, job_id="manual"):
     users_path = users_path or str(BASE_DIR / "users.csv")
